@@ -1,4 +1,3 @@
-use crate::gui::{Action, DData, RenderEvent};
 use smithay_client_toolkit::{
     default_environment,
     environment::SimpleGlobal,
@@ -12,9 +11,9 @@ use image::ImageBuffer;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
 use std::collections::HashMap;
-use std::os::unix::fs::PermissionsExt;
-use std::{cmp, env, fs, process};
+use std::{cmp, env, process};
 
+use crate::gui::{Action, DData, RenderEvent};
 use log::error;
 use nix::{
     sys::wait::{waitpid, WaitPidFlag, WaitStatus},
@@ -24,10 +23,13 @@ use notify_rust::Notification;
 use simplelog::{ColorChoice, Config as LogConfig, LevelFilter, TermLogger, TerminalMode};
 use std::error::Error;
 use std::time::Duration;
+use std::fs;
+use std::os::unix::fs::PermissionsExt;
 use tokio::task::JoinHandle;
 
 mod color;
 mod config;
+mod executors;
 mod font;
 mod gui;
 mod history;
