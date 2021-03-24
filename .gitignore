@@ -3,3 +3,4 @@
 perf.data*
 flame.svg
 flamegraph.svg
+.vscode
