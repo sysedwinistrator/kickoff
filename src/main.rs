@@ -15,21 +15,17 @@ use std::{cmp, env, process};
 
 use crate::gui::{Action, DData, RenderEvent};
 use log::error;
-use nix::{
-    sys::wait::{waitpid, WaitPidFlag, WaitStatus},
-    unistd::{fork, ForkResult},
-};
-use notify_rust::Notification;
 use simplelog::{ColorChoice, Config as LogConfig, LevelFilter, TermLogger, TerminalMode};
 use std::error::Error;
-use std::time::Duration;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use tokio::task::JoinHandle;
+use consumers::{StdoutConsumer, ExecConsumer, Consumer};
 
+mod cli;
 mod color;
 mod config;
-mod executors;
+mod consumers;
 mod font;
 mod gui;
 mod history;
@@ -55,6 +51,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 }
 
 async fn run() -> Result<Option<JoinHandle<()>>, Box<dyn Error>> {
+    let cli_matches = cli::get_matches();
     TermLogger::init(
         LevelFilter::Warn,
         LogConfig::default(),
@@ -84,7 +81,21 @@ async fn run() -> Result<Option<JoinHandle<()>>, Box<dyn Error>> {
         new_default_environment!(Env, fields = [layer_shell: SimpleGlobal::new(),])
             .expect("Initial roundtrip failed!");
 
-    let mut history = history_handle.await?.unwrap_or_default();
+    let history = history_handle.await?.unwrap_or_default();
+
+    let mut consumer: Box<dyn Consumer> = match cli_matches.value_of("CONSUMER") {
+        Some("stdout") => Box::new(StdoutConsumer::new()),
+        Some("exec") => Box::new(ExecConsumer::new(Some(history.clone()))),
+        Some(s) => {
+            error!("Unknown consumer: {}", s);
+            process::exit(1);
+        }
+        None => {
+            error!("No consumer set");
+            process::exit(1);
+        }
+    };
+
     let mut applications = applications_handle.await?.unwrap();
     for app in history.keys() {
         applications.push(app.to_string());
@@ -178,53 +189,7 @@ async fn run() -> Result<Option<JoinHandle<()>>, Box<dyn Error>> {
                     } else {
                         matched_exe.get(selection).unwrap().to_string()
                     };
-                    if let Ok(mut args) = shellwords::split(&query) {
-                        match unsafe { fork() } {
-                            Ok(ForkResult::Parent { child }) => {
-                                return Ok(Some(tokio::spawn(async move {
-                                    tokio::time::sleep(Duration::new(1, 0)).await;
-                                    match waitpid(child, Some(WaitPidFlag::WNOHANG)) {
-                                        Ok(WaitStatus::StillAlive)
-                                        | Ok(WaitStatus::Exited(_, 0)) => {
-                                            history.insert(
-                                                query.to_string(),
-                                                history.get(&query).unwrap_or(&0) + 1,
-                                            );
-                                            match history::commit_history(&history) {
-                                                Ok(_) => {}
-                                                Err(e) => {
-                                                    error!("{}", e.to_string())
-                                                }
-                                            };
-                                        }
-                                        Ok(_) => {
-                                            /* Every non 0 statuscode holds no information since it's
-                                            origin can be the started application or a file not found error.
-                                            In either case the error has already been logged and does not
-                                            need to be handled here. */
-                                        }
-                                        Err(err) => error!("{}", err),
-                                    }
-                                })));
-                            }
-                            Ok(ForkResult::Child) => {
-                                let err = exec::Command::new(args.remove(0)).args(&args).exec();
-
-                                // Won't be executed when exec was successful
-                                error!("{}", err);
-                                Notification::new()
-                                    .summary("Kickoff")
-                                    .body(&format!("{}", err))
-                                    .timeout(5000)
-                                    .show()?;
-                                process::exit(2);
-                            }
-                            Err(err) => {
-                                error!("{}", err);
-                            }
-                        }
-                        break;
-                    }
+                    return consumer.run(query);
                 }
                 Action::Exit => break,
             }
