@@ -14,13 +14,14 @@ use std::collections::HashMap;
 use std::{cmp, env, process};
 
 use crate::gui::{Action, DData, RenderEvent};
+use consumers::{Consumer, ExecConsumer, StdoutConsumer};
+use providers::{Provider, PathProvider};
 use log::error;
 use simplelog::{ColorChoice, Config as LogConfig, LevelFilter, TermLogger, TerminalMode};
 use std::error::Error;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use tokio::task::JoinHandle;
-use consumers::{StdoutConsumer, ExecConsumer, Consumer};
 
 mod cli;
 mod color;
@@ -28,6 +29,7 @@ mod config;
 mod consumers;
 mod font;
 mod gui;
+mod providers;
 mod history;
 
 default_environment!(Env,
@@ -67,11 +69,6 @@ async fn run() -> Result<Option<JoinHandle<()>>, Box<dyn Error>> {
         }
     };
 
-    let applications_handle = { tokio::spawn(async move { get_executable_names() }) };
-    let history_handle = {
-        let config = config.clone();
-        tokio::spawn(async move { history::get_history(config.history.decrease_interval) })
-    };
     let font_handle = {
         let config = config.clone();
         tokio::spawn(async move { font::Font::new(&config.font, config.font_size) })
@@ -81,7 +78,6 @@ async fn run() -> Result<Option<JoinHandle<()>>, Box<dyn Error>> {
         new_default_environment!(Env, fields = [layer_shell: SimpleGlobal::new(),])
             .expect("Initial roundtrip failed!");
 
-    let history = history_handle.await?.unwrap_or_default();
 
     let mut consumer: Box<dyn Consumer> = match cli_matches.value_of("CONSUMER") {
         Some("stdout") => Box::new(StdoutConsumer::new()),
@@ -96,19 +92,23 @@ async fn run() -> Result<Option<JoinHandle<()>>, Box<dyn Error>> {
         }
     };
 
-    let mut applications = applications_handle.await?.unwrap();
-    for app in history.keys() {
-        applications.push(app.to_string());
+    let mut providers: Vec<Box<dyn Provider>>;
+
+    for provider_name in cli_matches.values_of("PROVIDER").unwrap().collect() {
+        let provider = match provider_name {
+            "path" => PathProvider::new(config.clone())
+        };
+        providers.push(Box::new(provider));
     }
+    let mut provider_handles: Vec<JoinHandle<Vec<providers::ProviderItem>>>;
+    for provider in providers {
+        provider_handles.push(provider.get_options().expect(""));
+    }
+
+    let mut applications = applications_handle.await?.unwrap();
 
     applications.sort();
     applications.dedup();
-    applications.sort_by(|a, b| {
-        history
-            .get(b)
-            .unwrap_or(&0)
-            .cmp(history.get(a).unwrap_or(&0))
-    });
 
     let layer_shell = env.require_global::<zwlr_layer_shell_v1::ZwlrLayerShellV1>();
     let pools = env
@@ -276,33 +276,6 @@ async fn run() -> Result<Option<JoinHandle<()>>, Box<dyn Error>> {
         event_loop.dispatch(None, &mut data).unwrap();
     }
     Ok(None)
-}
-
-fn get_executable_names() -> Option<Vec<String>> {
-    let var = match env::var_os("PATH") {
-        Some(var) => var,
-        None => return None,
-    };
-
-    let mut res: Vec<String> = Vec::new();
-
-    let paths_iter = env::split_paths(&var);
-    let dirs_iter = paths_iter.filter_map(|path| fs::read_dir(path).ok());
-
-    for dir in dirs_iter {
-        let executables_iter = dir.filter_map(|file| file.ok()).filter(|file| {
-            if let Ok(metadata) = file.metadata() {
-                return !metadata.is_dir() && metadata.permissions().mode() & 0o111 != 0;
-            }
-            false
-        });
-
-        for exe in executables_iter {
-            res.push(exe.file_name().to_str().unwrap().to_string());
-        }
-    }
-
-    Some(res)
 }
 
 fn fuzzy_sort<'a>(

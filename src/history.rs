@@ -7,9 +7,9 @@ use std::io;
 use std::time::SystemTime;
 use xdg::BaseDirectories;
 
-pub fn get_history(decrease_interval: u64) -> Option<HashMap<String, usize>> {
+pub fn get_history(decrease_interval: u64, name: String) -> Option<HashMap<String, usize>> {
     let xdg_dirs = BaseDirectories::with_prefix("kickoff").ok()?;
-    let cache_file = xdg_dirs.find_cache_file("run.cache")?;
+    let cache_file = xdg_dirs.find_cache_file(format!("{}{}", name, ".cache"))?;
 
     let metadata = cache_file.metadata().unwrap();
     let last_modified = metadata.modified().unwrap();

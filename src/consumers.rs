@@ -1,4 +1,5 @@
 use crate::history;
+use crate::providers::ProviderItem;
 use log::error;
 use nix::{
     sys::wait::{waitpid, WaitPidFlag, WaitStatus},
@@ -12,7 +13,7 @@ use std::time::Duration;
 use tokio::task::JoinHandle;
 
 pub trait Consumer {
-    fn run(&mut self, query: String) -> Result<Option<JoinHandle<()>>, Box<dyn Error>>;
+    fn run(&mut self, query: &ProviderItem) -> Result<Option<JoinHandle<()>>, Box<dyn Error>>;
 }
 
 pub struct StdoutConsumer {}
@@ -22,9 +23,10 @@ impl StdoutConsumer {
         StdoutConsumer {}
     }
 }
+
 impl Consumer for StdoutConsumer {
-    fn run(&mut self, query: String) -> Result<Option<JoinHandle<()>>, Box<dyn Error>> {
-        println!("{}", query);
+    fn run(&mut self, item: &ProviderItem) -> Result<Option<JoinHandle<()>>, Box<dyn Error>> {
+        println!("{}", item);
         Ok(None)
     }
 }
@@ -35,18 +37,14 @@ pub struct ExecConsumer {
 
 impl ExecConsumer {
     pub fn new(history: Option<HashMap<String, usize>>) -> Self {
-        ExecConsumer {
-            history,
-        }
+        ExecConsumer { history }
     }
 }
 
 impl Consumer for ExecConsumer {
-
-    fn run(&mut self, query: String) -> Result<Option<JoinHandle<()>>, Box<dyn Error>> {
+    fn run(&mut self, item: &ProviderItem) -> Result<Option<JoinHandle<()>>, Box<dyn Error>> {
         if let Some(history) = &self.history {
-
-            if let Ok(mut args) = shellwords::split(&query) {
+            if let Ok(mut args) = shellwords::split(&item.executable.expect("Item is not executable")) {
                 match unsafe { fork() } {
                     Ok(ForkResult::Parent { child }) => {
                         let mut history = history.clone();
@@ -55,7 +53,7 @@ impl Consumer for ExecConsumer {
                             match waitpid(child, Some(WaitPidFlag::WNOHANG)) {
                                 Ok(WaitStatus::StillAlive) | Ok(WaitStatus::Exited(_, 0)) => {
                                     history.insert(
-                                        query.to_string(),
+                                        item.name,
                                         history.get(&query).unwrap_or(&0) + 1,
                                     );
                                     match history::commit_history(&history) {
@@ -87,9 +85,7 @@ impl Consumer for ExecConsumer {
                             .show()?;
                         process::exit(2);
                     }
-                    Err(err) => {
-                        Err(Box::new(err))
-                    }
+                    Err(err) => Err(Box::new(err)),
                 }
             } else {
                 Ok(None)

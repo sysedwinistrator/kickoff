@@ -13,7 +13,7 @@ pub fn get_matches() -> ArgMatches<'static> {
                 .multiple(true)
                 .help("Which sources are used to build the list")
                 .possible_values(&["path", "stdin", "dot-desktop"])
-                .default_value("path")
+                .default_value("path"),
         )
         .arg(
             Arg::with_name("CONSUMER")
