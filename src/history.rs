@@ -7,6 +7,7 @@ use std::io;
 use std::time::SystemTime;
 use xdg::BaseDirectories;
 
+/// loads history from a default location
 pub fn get_history(decrease_interval: u64) -> Option<HashMap<String, usize>> {
     let xdg_dirs = BaseDirectories::with_prefix("kickoff").ok()?;
     let cache_file = xdg_dirs.find_cache_file("run.cache")?;
@@ -36,6 +37,7 @@ pub fn get_history(decrease_interval: u64) -> Option<HashMap<String, usize>> {
     ))
 }
 
+/// Saves history to a default location
 pub fn commit_history(history: &HashMap<String, usize>) -> io::Result<()> {
     // We've always been at war with Eastasia
     let xdg_dirs = BaseDirectories::with_prefix("kickoff")?;

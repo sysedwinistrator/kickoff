@@ -1,9 +1,13 @@
+#![warn(missing_docs)]
 use image::Rgba;
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer};
 use std::fmt;
 use std::str::FromStr;
 
+/// Wrapper for RGBA Colors
+/// 
+/// Can be build from the css_color::Rgba module and converted into Rgba<u8> 
 #[derive(Clone)]
 pub struct Color(pub u8, pub u8, pub u8, pub u8);
 
@@ -18,9 +22,9 @@ impl From<css_color::Rgba> for Color {
     }
 }
 
-impl Color {
-    pub fn to_rgba(&self) -> Rgba<u8> {
-        Rgba([self.0, self.1, self.2, self.3])
+impl From<Color> for Rgba<u8> {
+    fn from(c: Color) -> Rgba<u8> {
+        Rgba([c.0, c.1, c.2, c.3])
     }
 }
 
@@ -33,6 +37,7 @@ impl<'de> Deserialize<'de> for Color {
     }
 }
 
+/// Serde Serialization Support
 struct ColorVisitor;
 
 impl<'de> Visitor<'de> for ColorVisitor {

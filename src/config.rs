@@ -143,6 +143,7 @@ impl Default for HistoryConfig {
 }
 
 impl Config {
+    /// Loads a config file. If no path is given, a default location will be read
     pub fn load(config_path: Option<PathBuf>) -> Result<Self, Box<dyn std::error::Error>> {
         let xdg_dirs = BaseDirectories::with_prefix("kickoff")?;
         if let Some(config_file) = config_path {

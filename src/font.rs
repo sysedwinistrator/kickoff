@@ -1,19 +1,17 @@
 use crate::color::Color;
+use fontconfig::Fontconfig;
 use fontdue::layout::{CoordinateSystem, GlyphRasterConfig, Layout, LayoutSettings, TextStyle};
 use fontdue::Metrics;
+use image::{Pixel, RgbaImage};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::PathBuf;
-
 use tokio::{
     fs::File,
     io::{self, AsyncReadExt},
 };
 
-use fontconfig::Fontconfig;
-
-use image::{Pixel, RgbaImage};
-
+/// Represents a loaded font
 pub struct Font {
     fonts: Vec<fontdue::Font>,
     layout: RefCell<Layout>,
@@ -22,6 +20,8 @@ pub struct Font {
 }
 
 impl Font {
+    /// Creates a new font from a list of names.
+    /// If fonts don't check out, fontconfig should pick the default font
     pub async fn new(font_names: Vec<String>, size: f32) -> io::Result<Font> {
         let fc = Fontconfig::new().expect("Couldn't load fontconfig");
         let font_names = if font_names.is_empty() {
@@ -54,6 +54,7 @@ impl Font {
         })
     }
 
+    /// Renders a single Glyph and caches the result
     fn render_glyph(&self, conf: GlyphRasterConfig) -> (Metrics, Vec<u8>) {
         let mut glyph_cache = self.glyph_cache.borrow_mut();
         if let Some(bitmap) = glyph_cache.get(&conf) {
@@ -69,6 +70,10 @@ impl Font {
         }
     }
 
+    /// Renders text into an existing image
+    /// 
+    /// Returns a tuple consisting of width and height
+    /// of the inserted text
     pub fn render(
         &mut self,
         text: &str,

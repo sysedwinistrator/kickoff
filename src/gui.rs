@@ -107,6 +107,7 @@ impl Surface {
         }
     }
 
+    /// Draws a given image to the window
     pub fn draw(&mut self, image: &RgbaImage) -> Result<(), std::io::Error> {
         if let Some(pool) = self.pools.pool() {
             let stride = 4 * self.dimensions.0 as i32;
@@ -164,6 +165,7 @@ pub enum Action {
     Paste,
 }
 
+/// Holds data that needs to be accessible to callbacks called by the event loop
 pub struct DData {
     pub query: String,
     pub action: Option<Action>,
@@ -173,6 +175,7 @@ pub struct DData {
 }
 
 impl DData {
+    /// Creates a minimal working set of dispatch data
     pub fn new(display: &Display, keybindings: Keybindings) -> DData {
         let clipboard = unsafe { Clipboard::new(display.get_display_ptr() as *mut _) };
         DData {
@@ -185,6 +188,7 @@ impl DData {
     }
 }
 
+/// Registers input handler to a given EventLoop
 pub fn register_inputs(
     seats: &[Attached<wl_seat::WlSeat>],
     event_loop: &calloop::EventLoop<DData>,

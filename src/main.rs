@@ -36,7 +36,8 @@ mod gui;
 mod history;
 mod keybinds;
 
-default_environment!(Env,
+default_environment!(
+    Env,
     fields = [
         layer_shell: SimpleGlobal<zwlr_layer_shell_v1::ZwlrLayerShellV1>,
     ],
@@ -52,17 +53,17 @@ struct Args {
     config: Option<PathBuf>,
 }
 
+/// Starts the programm and waits for an eventual JoinHandle
+/// to a task that has yet to be completed.
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     if let Some(child_handle) = run().await? {
-        /* wait for check if comand exec was successful
-           and history has been written
-        */
         child_handle.await?;
     }
     Ok(())
 }
 
+/// Setup and event loop
 async fn run() -> Result<Option<JoinHandle<()>>, Box<dyn Error>> {
     TermLogger::init(
         LevelFilter::Warn,
@@ -251,7 +252,7 @@ async fn run() -> Result<Option<JoinHandle<()>>, Box<dyn Error>> {
             let mut img = ImageBuffer::from_pixel(
                 surface.dimensions.0,
                 surface.dimensions.1,
-                config.colors.background.to_rgba(),
+                config.colors.background.clone().into(),
             );
             let prompt_width = if !config.prompt.is_empty() {
                 let (width, _) = font.render(

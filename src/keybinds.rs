@@ -67,6 +67,7 @@ pub struct KeyCombo {
 }
 
 impl Keybindings {
+    /// Looks up an action by keybind. Returns None if no matching keybind is present
     pub fn get(&self, modifiers: &ModifiersState, keysym: u32) -> Option<&Action> {
         self.inner.get(&KeyCombo {
             modifiers: Modifiers(*modifiers),
