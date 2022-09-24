@@ -11,16 +11,14 @@ use nom::{
     Finish, IResult,
 };
 use std::fs::File;
+use std::io;
 use std::{
     cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd},
     io::{BufRead, BufReader},
     path::PathBuf,
 };
 use std::{env, os::unix::fs::PermissionsExt};
-use tokio::{
-    io::{self, AsyncBufReadExt},
-    task::{spawn, spawn_blocking},
-};
+use tokio::task::spawn_blocking;
 
 #[derive(Eq, PartialEq, Debug, Clone)]
 pub struct Element {
@@ -120,7 +118,7 @@ impl ElementListBuilder {
     pub async fn build(&self) -> Result<ElementList, Box<dyn std::error::Error>> {
         let mut fut = Vec::new();
         if self.from_stdin {
-            fut.push(spawn(ElementListBuilder::build_stdin()))
+            fut.push(spawn_blocking(ElementListBuilder::build_stdin))
         }
         if !self.from_file.is_empty() {
             let files = self.from_file.clone();
@@ -207,14 +205,17 @@ impl ElementListBuilder {
         Ok(res)
     }
 
-    async fn build_stdin() -> Result<Vec<Element>, std::io::Error> {
-        let stdin = io::stdin();
-        let reader = io::BufReader::new(stdin);
-        let mut lines = reader.lines();
+    fn build_stdin() -> Result<Vec<Element>, std::io::Error> {
+        let mut lines = io::stdin().lines();
         let mut res = Vec::new();
 
-        while let Some(line) = lines.next_line().await? {
-            let kv_pair = match parse_line(&line) {
+        while let Some(line) = lines.next() {
+            let last_input = line?;
+            if last_input.len() == 0 {
+                break;
+            }
+
+            let kv_pair = match parse_line(&last_input) {
                 Ok(None) => continue,
                 Ok(Some(res)) => res,
                 Err(e) => {

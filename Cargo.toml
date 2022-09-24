@@ -18,11 +18,9 @@ image = { version = "0.24.3", default-features = false }
 fuzzy-matcher = "0.3.7"
 nix = { version = "0.25.0", default_features = false, features = ["process"] }
 css-color = "0.2.4"
-exec = "0.3.1"
 xdg = "2.4.1"
 toml = "0.5.9"
 serde = { version = "1.0.144", features = ["derive"] }
-hex = "0.4.3"
 smithay-clipboard = "0.6.6"
 log = "0.4.17"
 env_logger = "0.9.1"
@@ -36,19 +34,12 @@ nom = "7.1.1"
 
 [dependencies.tokio]
 version = "1.21.1"
-features = [
-    "fs",
-    "rt-multi-thread",
-    "io-util",
-    "time",
-    "rt",
-    "macros",
-    "io-std",
-]
+features = ["rt-multi-thread", "time", "rt", "macros"]
 default-features = false
 
 [profile.release]
 lto = true
+strip = true
 
 [dev-dependencies]
 criterion = { version = "0.4.0", features = ["async_tokio"] }

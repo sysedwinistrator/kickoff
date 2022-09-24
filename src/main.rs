@@ -1,4 +1,5 @@
 use crate::config::Config;
+use crate::font::Font;
 use crate::gui::{Action, DData, RenderEvent};
 use clap::Parser;
 use history::History;
@@ -108,13 +109,7 @@ async fn run() -> Result<Option<JoinHandle<()>>, Box<dyn Error>> {
         None
     };
 
-    let font = if let Some(font_name) = config.font {
-        let mut font_names = config.fonts.clone();
-        font_names.insert(0, font_name);
-        font::Font::new(font_names, config.font_size)
-    } else {
-        font::Font::new(config.fonts, config.font_size)
-    };
+    let font_handle = Font::from_config(&config);
 
     let (env, display, queue) =
         new_default_environment!(Env, fields = [layer_shell: SimpleGlobal::new(),])
@@ -150,7 +145,9 @@ async fn run() -> Result<Option<JoinHandle<()>>, Box<dyn Error>> {
     let mut data = DData::new(&display, config.keybindings.clone().into());
     let mut selection = 0;
     let mut select_query = false;
-    let mut font = font.await?;
+
+    // Collect async stuff
+    let mut font = font_handle.await??;
 
     loop {
         let gui::DData { query, action, .. } = &mut data;
@@ -343,7 +340,17 @@ fn exec(
             }))
         }
         Ok(ForkResult::Child) => {
-            let err = exec::Command::new("sh").args(&["-c", &elem.value]).exec();
+            use std::ffi::CString;
+            let err = nix::unistd::execvp(
+                &CString::new("sh").unwrap(),
+                &[
+                    &CString::new("-c").unwrap(),
+                    &CString::new(elem.value.as_bytes())
+                        .expect("CString::new failed for selected value"),
+                ],
+            )
+            .err()
+            .unwrap();
 
             // Won't be executed when exec was successful
             error!("{}", err);

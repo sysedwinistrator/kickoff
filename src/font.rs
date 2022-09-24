@@ -1,16 +1,14 @@
-use crate::color::Color;
+use crate::{color::Color, config::Config};
+use fontconfig::Fontconfig;
 use fontdue::layout::{CoordinateSystem, GlyphRasterConfig, Layout, LayoutSettings, TextStyle};
 use fontdue::Metrics;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::Read;
 use std::path::PathBuf;
-
-use tokio::{
-    fs::File,
-    io::{self, AsyncReadExt},
-};
-
-use fontconfig::Fontconfig;
+use tokio::io;
+use tokio::task::{spawn_blocking, JoinHandle};
 
 use image::{Pixel, RgbaImage};
 
@@ -21,8 +19,35 @@ pub struct Font {
     glyph_cache: RefCell<HashMap<GlyphRasterConfig, (Metrics, Vec<u8>)>>,
 }
 
+impl TryFrom<&Config> for Font {
+    type Error = std::io::Error;
+
+    fn try_from(config: &Config) -> Result<Self, Self::Error> {
+        if let Some(font_name) = config.font.as_ref() {
+            let mut font_names = config.fonts.clone();
+            font_names.insert(0, font_name.to_owned());
+            Self::new(font_names, config.font_size)
+        } else {
+            Self::new(config.fonts.clone(), config.font_size)
+        }
+    }
+}
+
 impl Font {
-    pub async fn new(font_names: Vec<String>, size: f32) -> io::Result<Font> {
+    pub fn from_config(config: &Config) -> JoinHandle<Result<Font, std::io::Error>> {
+        let font_names = if let Some(font_name) = config.font.as_ref() {
+            let mut font_names = config.fonts.clone();
+            font_names.insert(0, font_name.to_owned());
+            font_names
+        } else {
+            config.fonts.clone()
+        };
+
+        let font_size = config.font_size.clone();
+        spawn_blocking(move || Font::new(font_names, font_size))
+    }
+
+    pub fn new(font_names: Vec<String>, size: f32) -> io::Result<Font> {
         let fc = Fontconfig::new().expect("Couldn't load fontconfig");
         let font_names = if font_names.is_empty() {
             vec![String::new()]
@@ -38,9 +63,8 @@ impl Font {
         for font_path in font_paths {
             let mut font_buffer = Vec::new();
             File::open(font_path.to_str().unwrap())
-                .await?
-                .read_to_end(&mut font_buffer)
-                .await?;
+                .expect("Failed to read font file")
+                .read_to_end(&mut font_buffer)?;
             font_data.push(
                 fontdue::Font::from_bytes(font_buffer, fontdue::FontSettings::default()).unwrap(),
             );
