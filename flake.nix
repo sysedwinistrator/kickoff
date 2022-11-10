@@ -24,8 +24,8 @@
         # For `nix build` & `nix run`:
         defaultPackage = naersk'.buildPackage {
           src = ./.;
-          nativeBuildInputs = with pkgs; [cmake pkg-config freetype fontconfig wayland];
-          buildInputs = with pkgs; [freetype fontconfig wayland];
+          nativeBuildInputs = with pkgs; [cmake pkg-config freetype fontconfig wayland wayland-protocols];
+          buildInputs = with pkgs; [freetype fontconfig wayland wayland-protocols];
         };
 
         # For `nix develop` (optional, can be skipped):
