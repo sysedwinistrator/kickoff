@@ -27,7 +27,7 @@
           nativeBuildInputs = with pkgs; [cmake pkg-config];
           buildInputs = with pkgs; [freetype fontconfig wayland];
           postInstall = ''
-            ${pkgs.patchelf} --rpath ${pkgs.lib.makeLibraryPath buildInputs} $out/bin/kickoff
+            ${pkgs.patchelf}/bin/patchelf --rpath ${pkgs.lib.makeLibraryPath buildInputs} $out/bin/kickoff
           '';
         };
 
