@@ -24,8 +24,11 @@
         # For `nix build` & `nix run`:
         defaultPackage = naersk'.buildPackage {
           src = ./.;
-          nativeBuildInputs = with pkgs; [cmake pkg-config autoPatchelfHook];
+          nativeBuildInputs = with pkgs; [cmake pkg-config];
           buildInputs = with pkgs; [freetype fontconfig wayland];
+          postInstall = ''
+            ${pkgs.patchelf} --rpath ${pkgs.lib.makeLibraryPath buildInputs} $out/bin/kickoff
+          '';
         };
 
         # For `nix develop` (optional, can be skipped):
