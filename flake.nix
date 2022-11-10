@@ -22,7 +22,7 @@
         naersk' = pkgs.callPackage naersk {};
       in rec {
         # For `nix build` & `nix run`:
-        defaultPackage = naersk'.buildPackage {
+        defaultPackage = naersk'.buildPackage rec {
           src = ./.;
           nativeBuildInputs = with pkgs; [cmake pkg-config];
           buildInputs = with pkgs; [freetype fontconfig wayland];
